@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang=ja>
+    <head>
+        <meta charset=utf-8>
+        <meta name=viewport content="width=device-width,initial-scale=1">
+        <title>Acceleration</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Swiper/6.4.15/swiper-bundle.min.css">
+        <style>
+            html{
+                height:100%;
+            }
+            body{
+                height:100%;
+                margin:0;
+                min-height:100vh;
+            }
+            #wrapper{
+                padding-bottom:180px;
+                height:100%;
+                box-sizing: border-box;
+            }
+            .swiper-container,.swiper-slide{
+                height:100%;
+                width:100%;
+            }
+            
+            canvas{
+                position:absolute;
+                top:0;
+                left:0;
+                right:0;
+                bottom:0;
+                margin:auto;
+            }
+            
+            button{
+                font-size: 16px;
+            }
+            .space{
+                position:absolute;
+                top:0;
+                left:0;
+                right:0;
+                bottom:0;
+                width:80%;
+                height:40px;
+                border-radius: 5px;
+                border:3px solid #03c13d;
+                background-color: #fff;
+                margin:auto auto 30px;
+            }
+            #bottom{
+                height:100px;
+                width:100%;
+                display:flex;
+                flex-direction: row;
+                justify-content: space-evenly;
+                position:absolute;
+                bottom:20px;
+            }
+            .box{
+                display:inline-block;
+                width:100px;
+                vertical-align: middle;
+            }
+            #acc{
+                text-align: center;
+                margin-bottom:0px;
+                margin-top:auto;
+            }
+            .circle{
+                border-radius: 50%;
+                width:100px;
+                height:100px;
+                color:#fff;
+                border:none;
+            }
+            #start{
+                background-color:#378640;
+            }
+            p{
+                text-align: center;
+                width:80%;
+                margin-bottom:0;
+                margin-left:auto;
+                margin-right:auto;
+            }
+            h1{
+                font-size: 22px;
+                margin-top:0;
+                text-align: center;
+            }
+            #stop{
+                background-color:#f62e36;
+            }
+            .invisible{
+                display:none;
+            }
+        </style>
+    </head>
+    <body>
+        <div id=wrapper>
+            <div class="swiper-container">
+                <div class="swiper-wrapper">
+                    <div class="swiper-slide">
+                        <p>
+                            Measure Startで計測を開始し、Measure Stopで終了します。
+                            左下には各方向の加速度とサンプリング周期が表示されています。
+                        </p>
+                    </div>
+                    <div class="swiper-slide">
+                        <h1>Result of Measurement</h1>
+                        <p>
+                            計測を行うとここに結果が表示され、JSON形式でのダウンロードが可能です。
+                        </p>
+                        <canvas id=plot1 width=600 height=600></canvas>
+                        <button id=download onclick="elem('download').click();" class=invisible>Download</button>
+                    </div>
+                    <div class="swiper-slide">
+                        <p>Acceleretion Plot</p>
+                        <canvas id=plot2 width=600 height=600></canvas>
+                        <button onclick="wave_start();" class=invisible id=wave_start>Activate</button>
+                        <button onclick="wave_stop();" class=space id=wave_stop>Pause</button>
+                    </div>
+                    <div class="swiper-slide">
+                        <p>Ball Plot</p>
+                        <canvas id=plot3 width=600 height=600></canvas>
+                        <button onclick="wave_start();" class=invisible id=ball_start>Activate</button>
+                        <button onclick="wave_stop();" class=space id=ball_stop>Pause</button>
+                    </div>
+                    <div class="swiper-slide">
+                        <p>
+                            このページはSwiper.jsとChart.jsを利用しています。またモーションセンサへのアクセスを必要とします。
+                        </p>
+                    </div>
+                </div>              
+                <div class="swiper-pagination"></div>
+                <div class="swiper-button-prev"></div>
+                <div class="swiper-button-next"></div>
+            </div> 
+            <div id=bottom>
+                <div class=box><p id=acc>
+                    x: 0.00<br>y: 0.00<br>z: 0.00<br>t: 0.00
+                </p></div>
+                <div class=box>
+                    <button id=start onclick="measure_start()" class=circle><p>Measure</p><h1>Start</h1></button>
+                    <button id=stop onclick="measure_stop();" class=invisible><p>Measure</p><h1>Stop</h1></button>
+                </div>
+                <div class=box></div>
+            </div>
+        </div>
+        <a id=downloadlink></a>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/6.4.15/swiper-bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+        <script>
+            const jrColor=["#03c13d","#378640","#ff7e1c","#0072ba","#00acd1","#f62e36"];
+            const elem=(id)=>document.getElementById(id);
+            var acc={x:0,y:0,z:0,t:0},result={x:[],y:[],z:[],t:[],dt:0},measureId=0,waveId=0,plot1,plot2,download=elem("downloadlink");
+            window.addEventListener("devicemotion",(event)=>{
+                acc=event.accelerationIncludingGravity;
+                acc.t=event.interval;
+            },true);
+            const measure_start=()=>{
+                elem("start").className="invisible";
+                elem("stop").className="circle";
+                result={x:[acc.x],y:[acc.y],z:[acc.z],t:[0],dt:performance.now()};
+                measureId=setInterval(()=>{
+                    result.x.push(acc.x);
+                    result.y.push(acc.y);
+                    result.z.push(acc.z);
+                    result.t.push(performance.now()-result.dt);
+                },20);
+            }
+            const measure_stop=()=>{
+                elem("stop").className="invisible";
+                clearInterval(measureId);
+                result.dt=(performance.now()-result.dt)/result.x.length;
+                if(result.x.length>0){
+                    const blob=new Blob([JSON.stringify(result)],{type:"appliaction/json"});
+                    download.href=URL.createObjectURL(blob);
+                    download.download="acc.json";
+                }
+                elem("start").className="circle";
+                elem("download").className="space";
+                if(plot1) plot1.destroy();
+                plot1=new Chart(elem("plot1"),{
+                    type:"line",
+                    data:{
+                        labels:result.t.map(val=>(val/1000).toFixed(2)),
+                        datasets:[
+                            {
+                                label:"x",
+                                data:result.x,
+                                borderColor:jrColor[2],
+                            },{
+                                label:"y",
+                                data:result.y,
+                                borderColor:jrColor[3],
+                            },{
+                                label:"z",
+                                data:result.z,
+                                borderColor:jrColor[4],
+                            },
+                        ],
+                    },
+                    options:{
+                        scales:{
+                            yAxes:[{
+                                ticks:{
+                                    max:15,
+                                    min:-15,
+                                }
+                            }]
+                        }
+                    }
+                });
+                mySwiper.slideTo(2);
+            }
+            var mySwiper = new Swiper ('.swiper-container', {
+                direction: 'horizontal',
+                loop: true,
+                pagination: {
+                    el: '.swiper-pagination',
+                    type:"bullets",
+                    clickable:true,
+                },
+                navigation: {
+                    nextEl: '.swiper-button-next',
+                    prevEl: '.swiper-button-prev',
+                },
+            });
+            mySwiper.slideTo(3);
+            plot2=new Chart(elem("plot2"),{
+                type:"line",
+                data:{
+                    labels:["0.00"],
+                    datasets:[
+                        {
+                            label:"x",
+                            data:[acc.x],
+                            borderColor:jrColor[2],
+                        },{
+                            label:"y",
+                            data:[acc.y],
+                            borderColor:jrColor[3],
+                        },{
+                            label:"z",
+                            data:[acc.z],
+                            borderColor:jrColor[4],
+                        },
+                    ],
+                },
+                options:{
+                    animation:false,
+                    elements:{
+                        line:{
+                            tension:0,
+                        }
+                    },
+                    scales:{
+                        xAxes:[{
+                            ticks:{
+                                max:0,
+                                min:-3.5,
+                            },
+                        }],
+                        yAxes:[{
+                            ticks:{
+                                max:15,
+                                min:-15,
+                            }
+                        }],
+                    }
+                }
+            });
+            const range=0.3,e=0.7,y=3.0;
+            plot3=new Chart(elem("plot3"),{
+                type:"scatter",
+                data:{
+                    datasets:[{
+                        data:[{x:0,y:0}],
+                        pointBackgroundColor:jrColor[5],
+                        pointRadius:15,
+                    }],
+                },
+                options:{
+                    legend:false,
+                    animation:false,
+                    scales:{
+                        xAxes:[{
+                            ticks:{
+                                max:range,
+                                min:-range,
+                            },
+                        }],
+                        yAxes:[{
+                            ticks:{
+                                max:range,
+                                min:-range,
+                            }
+                        }],
+                    }
+                }
+            });
+            var exAcc={x:0,y:0},exVel=[{x:0.0001,y:0.0001}];
+            const wave_start=()=>{
+                elem("wave_start").className="invisible";
+                elem("ball_start").className="invisible";
+                waveId=setInterval(()=>{
+                    elem("acc").innerHTML="x: "+acc.x.toFixed(2)+"<br>y: "+acc.y.toFixed(2)+"<br>z: "+acc.z.toFixed(2)+"<br>t: "+acc.t.toFixed(1);
+                    if(mySwiper.activeIndex===3){
+                        plot2.data.datasets[0].data.push(acc.x);
+                        plot2.data.datasets[1].data.push(acc.y);
+                        plot2.data.datasets[2].data.push(acc.z);
+                        if(plot2.data.datasets[0].data.length>100){
+                            plot2.data.datasets[0].data.shift();
+                            plot2.data.datasets[1].data.shift();
+                            plot2.data.datasets[2].data.shift();
+                        }else{
+                            plot2.data.labels.unshift((-plot2.data.labels.length*0.04).toFixed(2));
+                        }
+                        plot2.update();
+                    }else if(mySwiper.activeIndex===4){
+                        let newVel=exVel.map((val,idx)=>{
+                            return {
+                                x:val.x-((exAcc.x+acc.x)/2+y*val.x)*0.04,
+                                y:val.y-((exAcc.y+acc.y)/2+y*val.y)*0.04,
+                            };
+                        });
+                        plot3.data.datasets[0].data=plot3.data.datasets[0].data.map((val,idx)=>{
+                            let newDisp={
+                                x:val.x+(exVel[idx].x+newVel[idx].x)*0.04/2,
+                                y:val.y+(exVel[idx].y+newVel[idx].y)*0.04/2,
+                            };
+                            let i=0;
+                            if(Math.abs(newDisp.x)>range){
+                                const v1=exVel[idx].x,v2=newVel[idx].x,d1=val.x,du=range*newDisp.x/Math.abs(newDisp.x);
+                                const tn=(Math.sqrt(v1**2+2*(du-d1)*(v2-v1)/0.04)-Math.abs(v1))/Math.abs(v2-v1)*0.04;
+                                const vn=(tn*v2+(0.04-tn)*v1)/0.04;
+                                newVel[idx].x=v2-(1+e)*vn;
+                                newDisp.x=du+(-e*vn+newVel[idx].x)*(0.04-tn)/2;
+                                if(newVel[idx].x*newDisp.x>0&&Math.abs(newDisp.x)>=range){
+                                    newDisp.x=du;
+                                    newVel[idx].x=0;
+                                }
+                            }
+                            if(Math.abs(newDisp.y)>range){
+                                const v1=exVel[idx].y,v2=newVel[idx].y,d1=val.y,du=range*newDisp.y/Math.abs(newDisp.y);
+                                const tn=(Math.sqrt(v1**2+2*(du-d1)*(v2-v1)/0.04)-Math.abs(v1))/Math.abs(v2-v1)*0.04;
+                                const vn=(tn*v2+(0.04-tn)*v1)/0.04;
+                                newVel[idx].y=v2-(1+e)*vn;
+                                newDisp.y=du+(-e*vn+newVel[idx].y)*(0.04-tn)/2;
+                                if(newVel[idx].y*newDisp.y>0&&Math.abs(newDisp.y)>=range){
+                                    newDisp.y=du;
+                                    newVel[idx].y=0;
+                                }
+                            }
+                            exVel[idx]=newVel[idx];
+                            return newDisp;
+                        });
+                        exAcc=acc;
+                        plot3.update();
+                    }
+                },40);
+                elem("wave_stop").className="space";
+                elem("ball_stop").className="space";
+            };
+            const wave_stop=()=>{
+                clearInterval(waveId);
+                elem("wave_start").className="space";
+                elem("ball_start").className="space";
+                elem("wave_stop").className="invisible";
+                elem("ball_stop").className="invisible";
+            };
+            wave_start();
+        </script>
+    </body>
+</html>
