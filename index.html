@@ -109,12 +109,12 @@
                         </p>
                     </div>
                     <div class="swiper-slide">
-                        <h1>Result of Measurement</h1>
+                        <p>Result of Measurement</p>
                         <p>
                             計測を行うとここに結果が表示され、JSON形式でのダウンロードが可能です。
                         </p>
                         <canvas id=plot1 width=600 height=600></canvas>
-                        <button id=download onclick="elem('downloadlink').click();" class=invisible>Download</button>
+                        <button id=download onclick="downloadclick()" class=invisible>Download</button>
                     </div>
                     <div class="swiper-slide">
                         <p>Acceleretion Plot</p>
@@ -155,7 +155,7 @@
         <script>
             const jrColor=["#03c13d","#378640","#ff7e1c","#0072ba","#00acd1","#f62e36"];
             const elem=(id)=>document.getElementById(id);
-            var acc={x:0,y:0,z:0,t:0},result={x:[],y:[],z:[],t:[],dt:0},measureId=0,waveId=0,plot1,plot2,download=elem("downloadlink");
+            var acc={x:0,y:0,z:0,t:0},result={x:[],y:[],z:[],t:[],dt:0},measureId=0,waveId=0,plot1,plot2;
             window.addEventListener("devicemotion",(event)=>{
                 acc=event.accelerationIncludingGravity;
                 acc.t=event.interval;
@@ -175,11 +175,6 @@
                 elem("stop").className="invisible";
                 clearInterval(measureId);
                 result.dt=(performance.now()-result.dt)/result.x.length;
-                if(result.x.length>0){
-                    const blob=new Blob([JSON.stringify(result)],{type:"appliaction/json"});
-                    download.href=URL.createObjectURL(blob);
-                    download.download="acc.json";
-                }
                 elem("start").className="circle";
                 elem("download").className="space";
                 if(plot1) plot1.destroy();
@@ -373,6 +368,27 @@
                 elem("ball_stop").className="invisible";
             };
             wave_start();
+            const downloadclick=()=>{
+                if(result.x.length>0){
+                    let download=elem("downloadlink");
+                    const blob=new Blob([JSON.stringify(result)],{type:"appliaction/json"});
+                    download.href=URL.createObjectURL(blob);
+                    download.download="acc.json";
+                    if(navigator.share){
+                        const file=new File([blob],"acc.json",{type:"application/json"});
+                        navigator.share({
+                            files:[file],
+                        }).then(()=>{
+                            console.log("Success");
+                        }).catch((error)=>{
+                            window.alert(error);
+                            download.click();
+                        });
+                    }else{
+                        download.click();
+                    }
+                }
+            }
         </script>
     </body>
 </html>
